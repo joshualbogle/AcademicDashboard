@@ -1,6 +1,6 @@
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Optional
+from decimal import Decimal
 
 from pydantic import BaseModel
 
@@ -14,6 +14,7 @@ class SATScoreRead(BaseModel):
     student_id: int
     test_date: date
     test_type: str
+    registration_number: Optional[str] = None
     ebrw_score: Optional[int] = None
     math_score: Optional[int] = None
     total_score: Optional[int] = None
@@ -40,6 +41,7 @@ class PSATScoreRead(BaseModel):
     student_id: int
     test_date: date
     test_type: str
+    registration_number: Optional[str] = None
     ebrw_score: Optional[int] = None
     math_score: Optional[int] = None
     total_score: Optional[int] = None
@@ -65,6 +67,7 @@ class ACTScoreRead(BaseModel):
     student_id: int
     test_date: date
     test_type: str
+    registration_number: Optional[str] = None
     english_score: Optional[int] = None
     math_score: Optional[int] = None
     reading_score: Optional[int] = None
@@ -140,7 +143,7 @@ class DIBELSScoreRead(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Combined student assessments response
+# Aggregate — all scores for a student in one response
 # ---------------------------------------------------------------------------
 
 class StudentAssessmentsRead(BaseModel):

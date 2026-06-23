@@ -6,17 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.database import Base, engine
 
-# Must be imported before create_all so SQLAlchemy's mapper registry
-# is fully populated when we call Base.metadata.create_all().
-import app.models  # noqa: F401
+import app.models  # noqa: F401 — populates SQLAlchemy mapper before create_all
 
-from app.api import (
-    health,
-    students,
-    assessments,
-    canvas,
-    auth,
-)
+from app.api import health, students, assessments, canvas, auth
 
 
 @asynccontextmanager
@@ -25,11 +17,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    version="1.0.0",
-    lifespan=lifespan,
-)
+app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,8 +36,4 @@ app.include_router(canvas.router, prefix="/api/canvas", tags=["Canvas"])
 
 @app.get("/")
 async def root():
-    return {
-        "application": settings.APP_NAME,
-        "version": "1.0.0",
-        "status": "online",
-    }
+    return {"application": settings.APP_NAME, "version": "1.0.0", "status": "online"}
