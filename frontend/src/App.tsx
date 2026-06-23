@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { Layout } from "./components/Layout";
@@ -10,7 +10,6 @@ import { StudentProfile } from "./pages/StudentProfile";
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -25,7 +24,6 @@ export default function App() {
             <Route path="students/:id" element={<StudentProfile />} />
           </Route>
         </Routes>
-      </BrowserRouter>
     </AuthProvider>
   );
 }
