@@ -1,0 +1,67 @@
+:root {
+  --navy: #1b2b4b;
+  --navy-light: #243660;
+  --amber: #e8a020;
+  --amber-light: #fdf3e0;
+  --bg: #f7f5f1;
+  --surface: #ffffff;
+  --border: #e2e0db;
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a5568;
+  --text-muted: #8a909e;
+
+  /* subject accent colors for score cards */
+  --color-reading: #0d7377;
+  --color-math: #4338ca;
+  --color-science: #15803d;
+  --color-english: #be185d;
+  --color-composite: #e8a020;
+  --color-writing: #7c3aed;
+  --color-stem: #0369a1;
+  --color-ela: #9d174d;
+
+  --sidebar-width: 220px;
+  --radius: 6px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select {
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.mono {
+  font-family: "DM Mono", monospace;
+}
