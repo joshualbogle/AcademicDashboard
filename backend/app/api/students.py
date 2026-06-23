@@ -1,50 +1,114 @@
-from sqlalchemy import Column, String, Integer, Date, Boolean, DateTime
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from typing import Optional
 
-from app.database import Base
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.core.permissions import require_any_group
+from app.core.roles import Groups
+from app.database import get_db
+from app.models.student import Student
+from app.schemas.student import StudentCreate, StudentRead, StudentSummary, StudentUpdate
+
+router = APIRouter()
+
+# Any authenticated school-division staff can read students.
+_readers = [Groups.ADMINS, Groups.COUNSELORS, Groups.HS, Groups.MS, Groups.LS]
+_writers = [Groups.ADMINS, Groups.COUNSELORS]
 
 
-class Student(Base):
-    __tablename__ = "students"
+@router.get("/", response_model=list[StudentSummary])
+def list_students(
+    division: Optional[str] = Query(None, description="Filter by division: LS, MS, HS"),
+    grade: Optional[int] = Query(None, description="Filter by grade level"),
+    active_only: bool = Query(True, description="Return only active students"),
+    search: Optional[str] = Query(None, description="Search by name or student ID"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_any_group(_readers)),
+):
+    q = db.query(Student)
 
-    id = Column(Integer, primary_key=True, index=True)
+    if active_only:
+        q = q.filter(Student.is_active == True)  # noqa: E712
+    if division:
+        q = q.filter(Student.division == division.upper())
+    if grade is not None:
+        q = q.filter(Student.grade == grade)
+    if search:
+        term = f"%{search}%"
+        q = q.filter(
+            Student.first_name.ilike(term)
+            | Student.last_name.ilike(term)
+            | Student.preferred_name.ilike(term)
+            | Student.student_id.ilike(term)
+        )
 
-    # Identifiers synced from Active Directory / Canvas
-    student_id = Column(String(32), unique=True, index=True, nullable=False)
-    ad_object_id = Column(String(64), unique=True, index=True, nullable=True)
-    canvas_user_id = Column(Integer, unique=True, index=True, nullable=True)
+    q = q.order_by(Student.last_name, Student.first_name)
+    return q.offset(skip).limit(limit).all()
 
-    # Name
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
-    preferred_name = Column(String(100), nullable=True)
 
-    # Contact
-    email = Column(String(255), unique=True, index=True, nullable=True)
+@router.get("/{student_id}", response_model=StudentRead)
+def get_student(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_any_group(_readers)),
+):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return student
 
-    # Enrollment
-    grade = Column(Integer, nullable=True)           # 1–12
-    division = Column(String(8), nullable=True)      # "LS", "MS", "HS"
-    graduation_year = Column(Integer, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
 
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+@router.post("/", response_model=StudentRead, status_code=status.HTTP_201_CREATED)
+def create_student(
+    payload: StudentCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_any_group(_writers)),
+):
+    existing = db.query(Student).filter(Student.student_id == payload.student_id).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Student with ID {payload.student_id} already exists",
+        )
 
-    # Relationships
-    sat_scores = relationship("SATScore", back_populates="student", cascade="all, delete-orphan")
-    psat_scores = relationship("PSATScore", back_populates="student", cascade="all, delete-orphan")
-    act_scores = relationship("ACTScore", back_populates="student", cascade="all, delete-orphan")
-    map_scores = relationship("MAPScore", back_populates="student", cascade="all, delete-orphan")
-    dibels_scores = relationship("DIBELSScore", back_populates="student", cascade="all, delete-orphan")
-    canvas_enrollments = relationship("CanvasEnrollment", back_populates="student", cascade="all, delete-orphan")
+    student = Student(**payload.model_dump())
+    db.add(student)
+    db.commit()
+    db.refresh(student)
+    return student
 
-    def __repr__(self) -> str:
-        return f"<Student {self.student_id} {self.last_name}, {self.first_name}>"
 
-    @property
-    def full_name(self) -> str:
-        display = self.preferred_name or self.first_name
-        return f"{display} {self.last_name}"
+@router.patch("/{student_id}", response_model=StudentRead)
+def update_student(
+    student_id: int,
+    payload: StudentUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_any_group(_writers)),
+):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(student, field, value)
+
+    db.commit()
+    db.refresh(student)
+    return student
+
+
+@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_student(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_any_group([Groups.ADMINS])),
+):
+    """Soft-delete: sets is_active=False rather than deleting the row."""
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+    student.is_active = False
+    db.commit()
